@@ -1,4 +1,4 @@
-# Genomic Sequence Analysis — Mouse Genome (mm9)
+# mm9-mouse-genomic-analysis
 
 This is Python pipeline for exploratory analysis of gene annotations and chromosomal
 sequences from four selected chromosomes of the *Mus musculus* mm9 genome build.
