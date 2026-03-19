@@ -17,7 +17,6 @@ import csv # This will provide functionality for reading and writing tabular dat
 import gc # This will provide an interface to the garbage collector, allowing manual control over memory management.
 import io # This will provide Python's main facilities for handling various types of I/O (input/output), including file I/O, string I/O, and in-memory streams.
 import zipfile # This  will allow you to create, read, write, append, and list files in a ZIP archive.
-import pyflakes
 
 from LoadFASTA_Function import LoadFastaFile, LoadGene, TSSChroms
 
@@ -125,7 +124,7 @@ sum_gene=ingene_numpy.sum() # Now by summing this array, we will find out the nu
 print(sum_gene)
 
 len(ingene_numpy)-sum_gene # Amount of non coding base-pairs of the chromosome 6
-sum_gene/len(ingene_numpy) # Fractions of non-coding DNA
+(sum_gene/len(ingene_numpy))*100 # Fractions of non-coding DNA
 
 #%%
 chr6_starts=TSSChroms(gene_inf,'chr6') # Finding TATA motif which work as regulatory regions
@@ -153,4 +152,9 @@ for g in chr6_starts.keys():
 len(tata_dis) # Now how many genes have a motif within 40 bps of each transcription starting site?
 
 #%%  Calculate the mean distance of the transcription start sites and the TATA motif
-sum(tata_dis.values())/len(tata_dis.values()) 
+if tata_dis:
+    mean_tata_dist = sum(tata_dis.values()) / len(tata_dis)
+    print(f'Mean TATA distance from TSS: {mean_tata_dist:.2f} bp')
+else:
+    print('No TATA motifs found within the search window — mean distance cannot be calculated.')
+ 

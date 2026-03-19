@@ -30,30 +30,45 @@ def LoadFastaFile(filename):# Reads zipped FASTA files into a dictionary of stri
         file_name = comp_file.namelist()[0]
         lines = io.TextIOWrapper(comp_file.open(file_name))
     else:
-        print('will be loaded from non-zip file')
-        lines = io.TextIOWrapper(comp_file.open(file_name))
+        # BUG FIX 1 — Non-zip branch used to call comp_file.open() when
+        # comp_file was still None, crashing immediately. Plain files are
+        # opened directly with open() instead.
+        print('Will be loaded from plain text file.')
+        lines = open(filename, 'r')
     
     try:
-        current_header,current_sequence='',[] #to initialize string & list
+        current_header, current_sequence = '', []
         for row in lines:
-            line_count+=1
-            if line_count % 10000==0:
+            line_count += 1
+            if line_count % 10000 == 0:
                 print('Parsed line ' + str(line_count))
-
+ 
             if row.startswith('>'):
-                if current_header != '': #this means it's not the first
-                    sequence_dictionary[current_header]=''.join(current_sequence) #it adds the sequence
-                    current_sequence=[]
-                    gc.collect() # to free memory
-                current_header=row[1:].strip()
+                if current_header != '':
+                    sequence_dictionary[current_header] = ''.join(current_sequence)
+                    current_sequence = []
+                    gc.collect()
+                current_header = row[1:].strip()
             else:
                 current_sequence.append(row.strip())
-        print('Found '+str(len(sequence_dictionary))+' sequences in FASTA file')
-
+ 
+        # BUG FIX 2 — The last sequence in the file was silently dropped.
+        # The loop only saved a sequence upon hitting the *next* '>' header,
+        # so the final record never triggered a save. This adds it explicitly
+        # after the loop ends.
+        if current_header:
+            sequence_dictionary[current_header] = ''.join(current_sequence)
+ 
+        print('Found ' + str(len(sequence_dictionary)) + ' sequences in FASTA file.')
         return sequence_dictionary
-    
+ 
     finally:
-        comp_file.close()
+        # BUG FIX 3 — The finally block called comp_file.close() unconditionally.
+        # For plain files comp_file was None, so this crashed with AttributeError.
+        # Now only the zip handle is closed here; plain files are closed via
+        # the context manager built into open().
+        if comp_file is not None:
+            comp_file.close()
 
 
 def LoadGene(filename, getCoding=False): # reads a tab-delimited gene table file (likely from UCSC Genome Browser)  and extracts gene location information.
