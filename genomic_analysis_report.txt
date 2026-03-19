@@ -1,0 +1,44 @@
+GENOMIC SEQUENCE ANALYSIS REPORT
+Organism : Mus musculus (mm9)
+Date     : 2026-03-18
+────────────────────────────────────────────────────────────
+
+1. DATASET OVERVIEW
+   Gene annotation file : mm9_sel_chroms_knownGene.txt
+   FASTA sequence file  : selChroms_mm9.fa.zip
+   Total transcripts    : 10,674
+   Chromosomes included : chr11, chr15, chr16, chr6
+
+2. GENE COUNTS PER CHROMOSOME
+   chr11     3,899 transcripts
+   chr15     2,110 transcripts
+   chr16     1,675 transcripts
+   chr6      2,990 transcripts
+
+3. GENE LENGTH STATISTICS (full transcript span, all chromosomes)
+   Mean   :       45,343 bp
+   Median :       15,509 bp
+   Min    :           23 bp
+   Max    :    3,171,331 bp
+   Histogram saved to : gene_length_distribution.png
+
+4. CODING vs. NON-CODING DNA — chromosome 6
+   Coding bp       :     67,695,635
+   Non-coding bp   :     81,811,744
+   Total span      :    149,507,379
+   Coding fraction :         0.4528  (45.28%)
+
+5. TATA MOTIF ANALYSIS — chromosome 6
+   Search window   : 40 bp upstream/downstream of TSS
+   Genes with TATA : 193  of  2,990 chr6 transcripts
+   Mean TATA dist  : 18.54 bp from TSS
+
+6. EXAMPLE GENE — Cntn4 (uc009dcr.2)
+   Chromosome  : chr6
+   Start       : 105,627,738
+   End         : 106,624,264
+   Length      : 996,526 bp
+   First ATG   : position 214 within transcript
+
+────────────────────────────────────────────────────────────
+End of report
