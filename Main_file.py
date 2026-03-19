@@ -1,160 +1,246 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sun May 25 16:56:13 2025
+Genomic Sequence Analysis — Mouse Genome (mm9)
+===============================================
+Performs a series of analyses on selected chromosomes from the mm9 mouse
+genome build, covering gene counting, sequence extraction, coding/non-coding
+quantification, and TATA motif detection near transcription start sites.
 
-@author: Benjamin Garcés Cifuentes
-email='agarces2381@gmail.com'
-
+Author : Benjamin Garcés Cifuentes
+Email  : agarces2381@gmail.com
+Python : 3.12
 """
-#%%
-'''
-# Sequence Analysis
-Importing necessary packages & Functions
-'''
 
-import csv # This will provide functionality for reading and writing tabular data in CSV (Comma Separated Values) format.
-import gc # This will provide an interface to the garbage collector, allowing manual control over memory management.
-import io # This will provide Python's main facilities for handling various types of I/O (input/output), including file I/O, string I/O, and in-memory streams.
-import zipfile # This  will allow you to create, read, write, append, and list files in a ZIP archive.
+# ── Imports ───────────────────────────────────────────────────────────────────
+# Standard library
+import csv
+import gc
+import io
+import zipfile
+from datetime import date
 
+# Third-party  (pip install numpy matplotlib)
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+
+# Local module
 from LoadFASTA_Function import LoadFastaFile, LoadGene, TSSChroms
 
-#%% Loading genome into a variable
-gene_file= 'mm9_sel_chroms_knownGene.txt' 
-file_open = open(gene_file).readlines() 
 
-gene_inf=LoadGene(gene_file) # creating a dictionary
-#%%
-'''
-To access any needed information such as the chromosome and position of 
-the gene on the chromosome, just use brackets like this:
-'''
+# ── 1. Load gene annotations ──────────────────────────────────────────────────
+# LoadGene parses the UCSC knownGene table into a dictionary keyed by
+# transcript identifier. Each entry holds chromosome, strand, and
+# transcript start/end coordinates.
+GENE_FILE  = 'mm9_sel_chroms_knownGene.txt'
+FASTA_FILE = 'selChroms_mm9.fa.zip'
+REPORT_OUT = 'genomic_analysis_report.txt'
+
+gene_inf = LoadGene(GENE_FILE)
+
+# Quick access example — chromosome of uc009auw.1:
 gene_inf['uc009auw.1']['chr']
 
-#%% Evaluating the Data
-chroms=[] # First we have to create a list
 
-for k in gene_inf.keys(): # For each gene, we look to see if the chromosome is in list.  If not, add it:
-  chr=gene_inf[k]['chr']
-  if chr not in chroms:
-    chroms=chroms+[chr]
+# ── 2. Identify chromosomes and count genes per chromosome ────────────────────
+# Collect unique chromosome names, then tally transcripts per chromosome.
+# Using a set avoids repeated membership checks on a growing list.
+chroms = sorted(set(gene_inf[g]['chr'] for g in gene_inf))
 
-#%% Counting Genes
-gene_counts={} # this codeline creates a dictionary to store the relevant gene information:
-for chr in chroms: # Now this new dictionary must be filled using two for loops: one for each  chromosome and one for each gene:
-  chrom_count=0 
-  for k in gene_inf.keys():
-    if gene_inf[k]['chr']==chr:
-      chrom_count+=1
-  gene_counts[chr]=chrom_count
+gene_counts = {}
+for chrom in chroms:
+    gene_counts[chrom] = sum(1 for g in gene_inf if gene_inf[g]['chr'] == chrom)
 
-#%% Locating identified Genes in Genomic Data
-fasta_file='selChroms_mm9.fa.zip' #Now the raw gene sequences can be read from the FASTA file.
-seq_dict=LoadFastaFile(fasta_file) # Now to load the sequences into a dictionary. This might take a minute...or two depending on your computer’s RAM and processor.
-cntn4="uc009dcr.2" # Now, you can start using the gene information within the chromosomes. 
 
-#%%
-gene_inf[cntn4]['chr'] # we can find out the chromosomal location of Cntn4 using our gene_info dictionary
+# ── 3. Load raw chromosomal sequences ────────────────────────────────────────
+# Reads the zipped FASTA file into a dictionary of strings.
+# This is the most memory-intensive step; expect 1-3 minutes on a typical
+# workstation depending on available RAM.
+seq_dict = LoadFastaFile(FASTA_FILE)
 
-#%% Dictionary of Data
-len(seq_dict['chr6']) # Use len() to see the length of any chromosome, like chromosome 6.
+# Length of chromosome 6 as a quick sanity check:
+len(seq_dict['chr6'])
 
-#%% Extracting Genetic Information
-'''
-You can peek into the entire chromosomal sequence where we know Cntn4 to reside:
-'''
-hchr=gene_inf[cntn4]['chr']
-hst=gene_inf[cntn4]['start']
-hen=gene_inf[cntn4]['end']
-cntn4_seq=seq_dict[hchr][hst:hen] # This variable pulls out the sequence of interest.
 
-cntn4_seq[5:200] # Each sequence is a string of characters now, you can identify specific parts of that gene.  
-#%% We can identify where translation begins in the gene sequence using the index command, built into the Python string library:
+# ── 4. Extract a gene sequence — Cntn4 (uc009dcr.2) ─────────────────────────
+# Retrieves the full transcript sequence of Cntn4 by slicing the chromosomal
+# string with the annotated start and end coordinates.
+CNTN4_ID = 'uc009dcr.2'
 
-cntn4_seq.index('ATG')
-#%% Genomic Statistics
-"""
-Here I create data structures. So far it works properly with python 3.12.7
-Using the gene_inf dictionary, find out the length of every gene on the four chromosomes collected. 
-First, import the NumPy module to include more complicated math calculations:
-if by any chance you find yourself with any errors, try running "pip install numpy" In the terminal
-"""
+cntn4_chr   = gene_inf[CNTN4_ID]['chr']
+cntn4_start = gene_inf[CNTN4_ID]['start']
+cntn4_end   = gene_inf[CNTN4_ID]['end']
+cntn4_seq   = seq_dict[cntn4_chr][cntn4_start:cntn4_end]
 
-import numpy as np
-#%%
-gene_lengths={} # Let's find the start and end of each gene, and store the difference:
-for g in gene_inf.keys():
-        st=gene_inf[g]['start']
-        en=gene_inf[g]['end']
-        gene_lengths[g]=np.absolute(en-st)
+# Inspect a short window and locate the first ATG start codon:
+cntn4_seq[5:200]
+cntn4_atg = cntn4_seq.index('ATG')
 
-import matplotlib.pyplot as plt # By using pyplot's basic plotting tools in matplotlib we create a histogram:
-"""If there's any problem importinb matplotlib try running "pip install matplotlib" in the terminal"""
-plt.hist(gene_lengths.values(), bins=50, log=True, facecolor='green')
 
-#%% basic mathematic operations with genes.
-"""
-To compare lengths of genes we can call out a gene by its identifier in the dictionary and add or substract it from 
-another gene sequence such as cntn4.
-"""
-gene_lengths["uc012enb.1"]-len(cntn4_seq)
+# ── 5. Gene length distribution ───────────────────────────────────────────────
+# Calculates the span (txEnd - txStart) for every transcript. Note that this
+# reflects the full pre-mRNA length including introns, not just coding exons.
+gene_lengths = {
+    g: np.absolute(gene_inf[g]['end'] - gene_inf[g]['start'])
+    for g in gene_inf
+}
 
-#%% Beyond the Coding Region
-"""
-Let’s use the gene_inf data structure to count the base pairs in genes compared to those that aren’t in coding regions.
-By using a set data structure, which stores unique items, you can remove duplicates. To make sure there are no double countings, let’s track the indices, of chromosome x so as not to add in a position in the list of coding regions if they’re already considered in another gene this way.
-"""
-# This can be done using a boolean array.
+lengths_array = np.array(list(gene_lengths.values()))
 
-chr6_len=len(seq_dict['chr6'])
+# ── Histogram ─────────────────────────────────────────────────────────────────
+# Gene lengths span several orders of magnitude, so the x-axis is plotted on
+# a log10 scale. Bins are computed in log space for uniform visual density.
+# The y-axis is also log-scaled to prevent the tall short-gene peak from
+# crushing the long-tail signal. A vertical line marks the median.
+fig, ax = plt.subplots(figsize=(9, 4.5))
 
-ingene_numpy=np.zeros(chr6_len,dtype=bool)
+log_lengths = np.log10(lengths_array[lengths_array > 0])
 
-for gene in gene_inf.keys():
-    if gene_inf[gene]['chr']=='chr6':
-        start_in=gene_inf[gene]['start']
-        end_in=gene_inf[gene]['end']
-        ingene_numpy[start_in:end_in]=True
+ax.hist(log_lengths, bins=80, color='#2E6F8E', alpha=0.85,
+        edgecolor='white', linewidth=0.3)
 
-ingene_numpy
-#%% Counting the coding base pairs
+ax.set_xlabel('Gene length (bp)', fontsize=11)
+ax.set_ylabel('Number of transcripts', fontsize=11)
+ax.set_title('Gene length distribution — mm9 selected chromosomes', fontsize=12, pad=12)
 
-sum_gene=ingene_numpy.sum() # Now by summing this array, we will find out the number of coding index sites (lenght of coding sequence in chr6)
-print(sum_gene)
+# Restore human-readable bp values on the log-scaled x-axis
+ax.xaxis.set_major_formatter(
+    ticker.FuncFormatter(lambda val, _: f'{10**val:,.0f}')
+)
+ax.set_yscale('log')
+ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
 
-len(ingene_numpy)-sum_gene # Amount of non coding base-pairs of the chromosome 6
-(sum_gene/len(ingene_numpy))*100 # Fractions of non-coding DNA
+# Median annotation
+median_log = np.median(log_lengths)
+ax.axvline(median_log, color='#E05A2B', linewidth=1.4,
+           linestyle='--', label=f'Median: {10**median_log:,.0f} bp')
+ax.legend(fontsize=10)
 
-#%%
-chr6_starts=TSSChroms(gene_inf,'chr6') # Finding TATA motif which work as regulatory regions
-'''
-This dictionary contains the starting positions of every gene in the chromosome.
-By default, the TATA binding motif relevant to transcriptions is located in a small window of the starting sites.
-Let's give it a try with a 40 base pair window upstream.
-Now with this dictionary, we can identify which genes contain a TATA binding motif near the starting site, which means
-these genes can be regulated with a TATA binding protein.
-'''
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+plt.tight_layout()
+plt.savefig('gene_length_distribution.png', dpi=150)
+plt.show()
+
+# Example: length difference between two transcripts
+gene_lengths['uc012enb.1'] - len(cntn4_seq)
+
+
+# ── 6. Coding vs. non-coding DNA on chromosome 6 ─────────────────────────────
+# A boolean NumPy array marks every base position covered by at least one
+# annotated transcript. Overlapping transcripts are handled correctly because
+# setting an already-True index to True is idempotent — no double counting.
+chr6_max     = max(gene_inf[g]['end'] for g in gene_inf if gene_inf[g]['chr'] == 'chr6')
+ingene_numpy = np.zeros(chr6_max, dtype=bool)
+
+for gene in gene_inf:
+    if gene_inf[gene]['chr'] == 'chr6':
+        ingene_numpy[gene_inf[gene]['start']:gene_inf[gene]['end']] = True
+
+coding_bp    = ingene_numpy.sum()
+total_bp     = len(ingene_numpy)
+noncoding_bp = total_bp - coding_bp
+coding_frac  = coding_bp / total_bp
+
+print(f'Chr6 — coding bp     : {coding_bp:,}')
+print(f'Chr6 — non-coding bp : {noncoding_bp:,}')
+print(f'Chr6 — coding fraction: {coding_frac:.4f}')
+
+
+# ── 7. TATA motif search near transcription start sites ───────────────────────
+# A 40 bp window immediately upstream of each TSS (downstream for minus-strand
+# genes) is searched for the canonical TATA box sequence. Position is recorded
+# as the offset within the window, which approximates distance from the TSS.
+chr6_starts = TSSChroms(gene_inf, 'chr6')
+WINDOW      = 40   # bp to search upstream/downstream of each TSS
+
 tata_dis = {}
-for g in chr6_starts.keys():
-    e = chr6_starts[g]
+for g in chr6_starts:
+    tss    = chr6_starts[g]
     strand = gene_inf[g]['strand']
     if strand == '+':
-        s = e - 40
-        if 'TATA' in seq_dict['chr6'][s:e].upper():
-            tata_dis[g] = seq_dict['chr6'][s:e].upper().rindex('TATA')
+        window_seq = seq_dict['chr6'][tss - WINDOW : tss].upper()
+        if 'TATA' in window_seq:
+            tata_dis[g] = window_seq.rindex('TATA')
     else:
-        s = e
-        e = s + 40
-        if 'TATA' in seq_dict['chr6'][s:e].upper():
-            tata_dis[g] = seq_dict['chr6'][s:e].upper().index('TATA')
+        window_seq = seq_dict['chr6'][tss : tss + WINDOW].upper()
+        if 'TATA' in window_seq:
+            tata_dis[g] = window_seq.index('TATA')
 
-len(tata_dis) # Now how many genes have a motif within 40 bps of each transcription starting site?
+print(f'Genes with TATA motif within {WINDOW} bp of TSS: {len(tata_dis)}')
 
-#%%  Calculate the mean distance of the transcription start sites and the TATA motif
 if tata_dis:
     mean_tata_dist = sum(tata_dis.values()) / len(tata_dis)
     print(f'Mean TATA distance from TSS: {mean_tata_dist:.2f} bp')
 else:
-    print('No TATA motifs found within the search window — mean distance cannot be calculated.')
- 
+    print('No TATA motifs found within the search window — '
+          'mean distance cannot be calculated.')
+
+
+# ── 8. Report output ──────────────────────────────────────────────────────────
+# Writes a plain-text summary of all computed results. Useful as a portable
+# record attached to a notebook, thesis appendix, or repository README.
+
+def write_report(path):
+    """Write a structured plain-text summary of all analysis results."""
+    sep = '─' * 60
+    lines = [
+        'GENOMIC SEQUENCE ANALYSIS REPORT',
+        f'Organism : Mus musculus (mm9)',
+        f'Date     : {date.today().isoformat()}',
+        sep,
+        '',
+        '1. DATASET OVERVIEW',
+        f'   Gene annotation file : {GENE_FILE}',
+        f'   FASTA sequence file  : {FASTA_FILE}',
+        f'   Total transcripts    : {len(gene_inf):,}',
+        f'   Chromosomes included : {", ".join(chroms)}',
+        '',
+        '2. GENE COUNTS PER CHROMOSOME',
+    ]
+    for chrom, count in sorted(gene_counts.items()):
+        lines.append(f'   {chrom:<8} {count:>6,} transcripts')
+
+    lines += [
+        '',
+        '3. GENE LENGTH STATISTICS (full transcript span, all chromosomes)',
+        f'   Mean   : {lengths_array.mean():>12,.0f} bp',
+        f'   Median : {np.median(lengths_array):>12,.0f} bp',
+        f'   Min    : {lengths_array.min():>12,} bp',
+        f'   Max    : {lengths_array.max():>12,} bp',
+        f'   Histogram saved to : gene_length_distribution.png',
+        '',
+        '4. CODING vs. NON-CODING DNA — chromosome 6',
+        f'   Coding bp       : {coding_bp:>14,}',
+        f'   Non-coding bp   : {noncoding_bp:>14,}',
+        f'   Total span      : {total_bp:>14,}',
+        f'   Coding fraction : {coding_frac:>14.4f}  ({coding_frac*100:.2f}%)',
+        '',
+        '5. TATA MOTIF ANALYSIS — chromosome 6',
+        f'   Search window   : {WINDOW} bp upstream/downstream of TSS',
+        f'   Genes with TATA : {len(tata_dis):,}  of  {len(chr6_starts):,} chr6 transcripts',
+    ]
+    if tata_dis:
+        lines.append(f'   Mean TATA dist  : {mean_tata_dist:.2f} bp from TSS')
+    else:
+        lines.append('   Mean TATA dist  : N/A (no motifs found)')
+
+    lines += [
+        '',
+        '6. EXAMPLE GENE — Cntn4 (uc009dcr.2)',
+        f'   Chromosome  : {cntn4_chr}',
+        f'   Start       : {cntn4_start:,}',
+        f'   End         : {cntn4_end:,}',
+        f'   Length      : {len(cntn4_seq):,} bp',
+        f'   First ATG   : position {cntn4_atg} within transcript',
+        '',
+        sep,
+        'End of report',
+    ]
+
+    with open(path, 'w') as f:
+        f.write('\n'.join(lines) + '\n')
+    print(f'Report written to: {path}')
+
+write_report(REPORT_OUT)
